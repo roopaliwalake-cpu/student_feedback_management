@@ -1,0 +1,25 @@
+{
+    "name": "Bangalore University Student Feedback",
+    "short_name": "BU Feedback",
+    "description": "Student feedback management system for Bangalore University.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#f5f7fb",
+    "theme_color": "#0f6b63",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/static/images/bangalore-university-logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/images/bangalore-university-logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
