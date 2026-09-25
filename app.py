@@ -30,7 +30,6 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 ADMIN_NAME = "Roopali Walake"
 ADMIN_EMAIL = "roopaliwalake@gmail.com"
-ADMIN_PASSWORD = "roopali@123"
 SESSIONS = {}
 PASSWORD_OTPS = {}
 ENV_LOADED = False
@@ -712,10 +711,19 @@ def init_db():
         ]
         for department in existing_departments:
             conn.execute("INSERT IGNORE INTO departments(name) VALUES(%s)", (department,))
-        conn.execute(
-            "INSERT IGNORE INTO admins(name,email,password_hash) VALUES(%s,%s,%s)",
-            (ADMIN_NAME, ADMIN_EMAIL, hash_password(ADMIN_PASSWORD)),
-        )
+        admin_exists = conn.execute(
+            "SELECT id FROM admins WHERE email=%s LIMIT 1", (ADMIN_EMAIL,)
+        ).fetchone()
+        if not admin_exists:
+            admin_password = env_value("ADMIN_PASSWORD")
+            if not admin_password:
+                raise RuntimeError(
+                    "ADMIN_PASSWORD must be set before starting a new deployment."
+                )
+            conn.execute(
+                "INSERT INTO admins(name,email,password_hash) VALUES(%s,%s,%s)",
+                (ADMIN_NAME, ADMIN_EMAIL, hash_password(admin_password)),
+            )
         conn.execute("UPDATE admins SET name=%s WHERE email=%s", (ADMIN_NAME, ADMIN_EMAIL))
         resequence_all_tables(conn)
 
@@ -1835,7 +1843,7 @@ class App(BaseHTTPRequestHandler):
 
     def feedback_review_options(self):
         return """
-        <section class="panel feedback-review-panel">
+        <section class="feedback-review-panel">
             <div class="section-head">
                 <div>
                     <h2>Feedback Review</h2>

@@ -43,6 +43,7 @@ Set these on the Python app service:
 ```text
 HOST=0.0.0.0
 COOKIE_SECURE=1
+ADMIN_PASSWORD=<a-strong-private-admin-password>
 MYSQLHOST=<from Railway MySQL>
 MYSQLPORT=<from Railway MySQL>
 MYSQLUSER=<from Railway MySQL>
@@ -101,6 +102,7 @@ Set:
 HOST=0.0.0.0
 PORT=<the platform-provided port, if required>
 COOKIE_SECURE=1
+ADMIN_PASSWORD=<a-strong-private-admin-password>
 MYSQL_HOST=<cloud-mysql-host>
 MYSQL_PORT=3306
 MYSQL_USER=<cloud-mysql-user>
@@ -129,6 +131,7 @@ Health check path: /health
 ```text
 HOST=0.0.0.0
 COOKIE_SECURE=1
+ADMIN_PASSWORD=<a-strong-private-admin-password>
 MYSQL_HOST=<tidb-host>
 MYSQL_PORT=4000
 MYSQL_USER=<tidb-user>
@@ -142,6 +145,7 @@ If TiDB gives you one connection string, you can use this instead:
 ```text
 HOST=0.0.0.0
 COOKIE_SECURE=1
+ADMIN_PASSWORD=<a-strong-private-admin-password>
 DATABASE_URL=mysql://<user>:<password>@<host>:4000/<database>?ssl=true
 ```
 
