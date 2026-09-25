@@ -1424,8 +1424,15 @@ class App(BaseHTTPRequestHandler):
         return selected_language(saved.value if saved else "") or "en"
 
     def health(self):
-        data = b"ok"
-        self.send_response(200)
+        try:
+            with db() as conn:
+                conn.execute("SELECT 1").fetchone()
+            data = b"ok"
+            status = 200
+        except Exception:
+            data = b"database unavailable"
+            status = 503
+        self.send_response(status)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -2127,8 +2134,17 @@ class App(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if method != "POST":
+            selected_department = query.get("department", [""])[0].strip()
             with db() as conn:
-                faculty = conn.execute("SELECT * FROM faculty ORDER BY department,name").fetchall()
+                departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
+                if selected_department not in departments:
+                    selected_department = ""
+                faculty = []
+                if selected_department:
+                    faculty = conn.execute(
+                        "SELECT * FROM faculty WHERE department=%s ORDER BY name",
+                        (selected_department,),
+                    ).fetchall()
             rows = "".join(
                 f"""
                 <tr>
@@ -2146,7 +2162,17 @@ class App(BaseHTTPRequestHandler):
                 </tr>
                 """
                 for f in faculty
-            ) or "<tr><td colspan='6'>No faculty added yet.</td></tr>"
+            ) or (
+                "<tr><td colspan='6'>No faculty added for this department.</td></tr>"
+                if selected_department
+                else "<tr><td colspan='6'>Select a department to view faculty.</td></tr>"
+            )
+            faculty_filter = f"""
+            <form method="get" action="/admin/faculty/add" class="inline-form department-filter">
+                {department_select("Department", selected_department)}
+                <button class="button" type="submit">View Faculty</button>
+            </form>
+            """
             body = f"""
             <section class="panel narrow">
                 <h1>Add Faculty</h1>
@@ -2163,6 +2189,7 @@ class App(BaseHTTPRequestHandler):
             </section>
             <section class="panel">
                 <h2>Faculty Accounts</h2>
+                {faculty_filter}
                 <div class="table-wrap"><table><thead><tr><th>Name</th><th>Employee ID</th><th>Department</th><th>Subject</th><th>Email</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
             </section>
             {self.admin_back_link()}
@@ -2223,8 +2250,17 @@ class App(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if method != "POST":
+            selected_department = query.get("department", [""])[0].strip()
             with db() as conn:
-                students = conn.execute("SELECT * FROM students ORDER BY department,name").fetchall()
+                departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
+                if selected_department not in departments:
+                    selected_department = ""
+                students = []
+                if selected_department:
+                    students = conn.execute(
+                        "SELECT * FROM students WHERE department=%s ORDER BY name",
+                        (selected_department,),
+                    ).fetchall()
             rows = "".join(
                 f"""
                 <tr>
@@ -2243,7 +2279,17 @@ class App(BaseHTTPRequestHandler):
                 </tr>
                 """
                 for s in students
-            ) or "<tr><td colspan='7'>No students added yet.</td></tr>"
+            ) or (
+                "<tr><td colspan='7'>No students added for this department.</td></tr>"
+                if selected_department
+                else "<tr><td colspan='7'>Select a department to view students.</td></tr>"
+            )
+            student_filter = f"""
+            <form method="get" action="/admin/student/add" class="inline-form department-filter">
+                {department_select("Department", selected_department)}
+                <button class="button" type="submit">View Students</button>
+            </form>
+            """
             body = f"""
             <section class="panel narrow">
                 <h1>Add Student</h1>
@@ -2259,6 +2305,7 @@ class App(BaseHTTPRequestHandler):
             </section>
             <section class="panel">
                 <h2>Student Accounts</h2>
+                {student_filter}
                 <div class="table-wrap"><table><thead><tr><th>Name</th><th>Roll Number</th><th>Department</th><th>Email</th><th>Login ID</th><th>Default Password</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
             </section>
             {self.admin_back_link()}
