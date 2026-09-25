@@ -1381,8 +1381,10 @@ class App(BaseHTTPRequestHandler):
             "/admin/department/add": self.add_department,
             "/admin/department/hod": self.set_department_hod,
             "/admin/faculty/add": self.add_faculty,
+            "/admin/faculty/list": self.faculty_list,
             "/admin/faculty/remove": self.remove_faculty,
             "/admin/student/add": self.add_student,
+            "/admin/student/list": self.student_list,
             "/admin/student/remove": self.remove_student,
             "/admin/feedback-window": self.set_feedback_window,
             "/admin/feedback-review": self.admin_feedback_review,
@@ -1998,8 +2000,10 @@ class App(BaseHTTPRequestHandler):
         <section class="grid three admin-menu">
             <a class="card" href="/admin/department/add"><h2>Add Department</h2><p>{department_count} departments</p></a>
             <a class="card" href="/admin/faculty/add"><h2>Add Faculty</h2><p>{faculty_count} faculty accounts</p></a>
+            <a class="card" href="/admin/faculty/list"><h2>View Faculty</h2><p>Choose a department to view faculty</p></a>
             <a class="card" href="/admin/department/hod"><h2>Assign HOD</h2><p>One HOD per department</p></a>
             <a class="card" href="/admin/student/add"><h2>Add Student</h2><p>{student_count} student accounts</p></a>
+            <a class="card" href="/admin/student/list"><h2>View Students</h2><p>Choose a department to view students</p></a>
             <a class="card" href="/admin/feedback-window"><h2>Feedback Timeline</h2><p>{timeline_count} department timelines</p></a>
             <a class="card" href="/admin/feedback-review"><h2>Feedback Review</h2><p>Open overall, department-wise, or faculty-wise charts</p></a>
             <a class="card" href="/admin/reports"><h2>Reports</h2><p>Open and download reports</p></a>
@@ -2134,45 +2138,6 @@ class App(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if method != "POST":
-            selected_department = query.get("department", [""])[0].strip()
-            with db() as conn:
-                departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
-                if selected_department not in departments:
-                    selected_department = ""
-                faculty = []
-                if selected_department:
-                    faculty = conn.execute(
-                        "SELECT * FROM faculty WHERE department=%s ORDER BY name",
-                        (selected_department,),
-                    ).fetchall()
-            rows = "".join(
-                f"""
-                <tr>
-                    <td>{esc(f['name'])}</td>
-                    <td>{esc(f['employee_id'])}</td>
-                    <td>{esc(f['department'])}</td>
-                    <td>{esc(f['subject'])}</td>
-                    <td>{esc(f['email'])}</td>
-                    <td>
-                        <form method="post" action="/admin/faculty/remove" class="inline-form" onsubmit="return confirm('Remove this faculty account?');">
-                            <input type="hidden" name="faculty_id" value="{f['id']}">
-                            <button class="button danger small" type="submit">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-                """
-                for f in faculty
-            ) or (
-                "<tr><td colspan='6'>No faculty added for this department.</td></tr>"
-                if selected_department
-                else "<tr><td colspan='6'>Select a department to view faculty.</td></tr>"
-            )
-            faculty_filter = f"""
-            <form method="get" action="/admin/faculty/add" class="inline-form department-filter">
-                {department_select("Department", selected_department)}
-                <button class="button" type="submit">View Faculty</button>
-            </form>
-            """
             body = f"""
             <section class="panel narrow">
                 <h1>Add Faculty</h1>
@@ -2186,11 +2151,6 @@ class App(BaseHTTPRequestHandler):
                     {field("Temporary Password", "password", "password")}
                     <button class="button" type="submit">Add Faculty Login</button>
                 </form>
-            </section>
-            <section class="panel">
-                <h2>Faculty Accounts</h2>
-                {faculty_filter}
-                <div class="table-wrap"><table><thead><tr><th>Name</th><th>Employee ID</th><th>Department</th><th>Subject</th><th>Email</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
             </section>
             {self.admin_back_link()}
             """
@@ -2223,6 +2183,59 @@ class App(BaseHTTPRequestHandler):
             return self.redirect("/admin/faculty/add?faculty_error=1")
         self.redirect("/admin/faculty/add?faculty_added=1")
 
+    def faculty_list(self, method):
+        user = self.require("admin")
+        if not user:
+            return
+        query = parse_qs(urlparse(self.path).query)
+        selected_department = query.get("department", [""])[0].strip()
+        with db() as conn:
+            departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
+            if selected_department not in departments:
+                selected_department = ""
+            faculty = []
+            if selected_department:
+                faculty = conn.execute(
+                    "SELECT * FROM faculty WHERE department=%s ORDER BY name",
+                    (selected_department,),
+                ).fetchall()
+        rows = "".join(
+            f"""
+            <tr>
+                <td>{esc(f['name'])}</td>
+                <td>{esc(f['employee_id'])}</td>
+                <td>{esc(f['department'])}</td>
+                <td>{esc(f['subject'])}</td>
+                <td>{esc(f['email'])}</td>
+                <td>
+                    <form method="post" action="/admin/faculty/remove" class="inline-form" onsubmit="return confirm('Remove this faculty account?');">
+                        <input type="hidden" name="faculty_id" value="{f['id']}">
+                        <button class="button danger small" type="submit">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            """
+            for f in faculty
+        ) or (
+            "<tr><td colspan='6'>No faculty added for this department.</td></tr>"
+            if selected_department
+            else "<tr><td colspan='6'>Select a department to view faculty.</td></tr>"
+        )
+        body = f"""
+        <section class="dashboard-head slim">
+            <div><h1>View Faculty</h1><p>Select a department to view and manage its faculty accounts.</p></div>
+        </section>
+        <section class="panel directory-panel">
+            <form method="get" action="/admin/faculty/list" class="department-filter">
+                {department_select("Department", selected_department)}
+                <button class="button" type="submit">View Faculty</button>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Name</th><th>Employee ID</th><th>Department</th><th>Subject</th><th>Email</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
+        </section>
+        {self.admin_back_link()}
+        """
+        self.send_html(page("View Faculty", body, user))
+
     def remove_faculty(self, method):
         user = self.require("admin")
         if not user:
@@ -2250,46 +2263,6 @@ class App(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if method != "POST":
-            selected_department = query.get("department", [""])[0].strip()
-            with db() as conn:
-                departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
-                if selected_department not in departments:
-                    selected_department = ""
-                students = []
-                if selected_department:
-                    students = conn.execute(
-                        "SELECT * FROM students WHERE department=%s ORDER BY name",
-                        (selected_department,),
-                    ).fetchall()
-            rows = "".join(
-                f"""
-                <tr>
-                    <td>{esc(s['name'])}</td>
-                    <td>{esc(s['roll_number'])}</td>
-                    <td>{esc(s['department'])}</td>
-                    <td>{esc(s['email'])}</td>
-                    <td>{esc(s['username'])}</td>
-                    <td>{esc(student_default_password(s['name']))}</td>
-                    <td>
-                        <form method="post" action="/admin/student/remove" class="inline-form" onsubmit="return confirm('Remove this student account?');">
-                            <input type="hidden" name="student_id" value="{s['id']}">
-                            <button class="button danger small" type="submit">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-                """
-                for s in students
-            ) or (
-                "<tr><td colspan='7'>No students added for this department.</td></tr>"
-                if selected_department
-                else "<tr><td colspan='7'>Select a department to view students.</td></tr>"
-            )
-            student_filter = f"""
-            <form method="get" action="/admin/student/add" class="inline-form department-filter">
-                {department_select("Department", selected_department)}
-                <button class="button" type="submit">View Students</button>
-            </form>
-            """
             body = f"""
             <section class="panel narrow">
                 <h1>Add Student</h1>
@@ -2302,11 +2275,6 @@ class App(BaseHTTPRequestHandler):
                     {field("Student Email", "email", "email")}
                     <button class="button" type="submit">Add Student Login</button>
                 </form>
-            </section>
-            <section class="panel">
-                <h2>Student Accounts</h2>
-                {student_filter}
-                <div class="table-wrap"><table><thead><tr><th>Name</th><th>Roll Number</th><th>Department</th><th>Email</th><th>Login ID</th><th>Default Password</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
             </section>
             {self.admin_back_link()}
             """
@@ -2342,6 +2310,60 @@ class App(BaseHTTPRequestHandler):
         except DB_INTEGRITY_ERRORS:
             return self.redirect("/admin/student/add?student_error=1")
         self.redirect("/admin/student/add?student_added=1")
+
+    def student_list(self, method):
+        user = self.require("admin")
+        if not user:
+            return
+        query = parse_qs(urlparse(self.path).query)
+        selected_department = query.get("department", [""])[0].strip()
+        with db() as conn:
+            departments = [row["name"] for row in conn.execute("SELECT name FROM departments ORDER BY name").fetchall()]
+            if selected_department not in departments:
+                selected_department = ""
+            students = []
+            if selected_department:
+                students = conn.execute(
+                    "SELECT * FROM students WHERE department=%s ORDER BY name",
+                    (selected_department,),
+                ).fetchall()
+        rows = "".join(
+            f"""
+            <tr>
+                <td>{esc(s['name'])}</td>
+                <td>{esc(s['roll_number'])}</td>
+                <td>{esc(s['department'])}</td>
+                <td>{esc(s['email'])}</td>
+                <td>{esc(s['username'])}</td>
+                <td>{esc(student_default_password(s['name']))}</td>
+                <td>
+                    <form method="post" action="/admin/student/remove" class="inline-form" onsubmit="return confirm('Remove this student account?');">
+                        <input type="hidden" name="student_id" value="{s['id']}">
+                        <button class="button danger small" type="submit">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            """
+            for s in students
+        ) or (
+            "<tr><td colspan='7'>No students added for this department.</td></tr>"
+            if selected_department
+            else "<tr><td colspan='7'>Select a department to view students.</td></tr>"
+        )
+        body = f"""
+        <section class="dashboard-head slim">
+            <div><h1>View Students</h1><p>Select a department to view and manage its student accounts.</p></div>
+        </section>
+        <section class="panel directory-panel">
+            <form method="get" action="/admin/student/list" class="department-filter">
+                {department_select("Department", selected_department)}
+                <button class="button" type="submit">View Students</button>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Name</th><th>Roll Number</th><th>Department</th><th>Email</th><th>Login ID</th><th>Default Password</th><th>Action</th></tr></thead><tbody>{rows}</tbody></table></div>
+        </section>
+        {self.admin_back_link()}
+        """
+        self.send_html(page("View Students", body, user))
 
     def remove_student(self, method):
         user = self.require("admin")
